@@ -1,0 +1,12 @@
+alter function public.enforce_fleet_org_membership() set search_path = public;
+alter function public.fn_assign_profile_display_id() set search_path = public;
+alter function public.fn_touch_updated_at() set search_path = public;
+alter function public.fn_block_vehicle_switch_during_active_session() set search_path = public;
+alter function public.set_active_vehicle(p_vehicle_id uuid) set search_path = public;
+alter function public.fn_assign_vehicle_display_id() set search_path = public;
+alter function public.fn_assign_driver_slot_display_id() set search_path = public;
+alter function public.fn_freeze_closed_route() set search_path = public;
+alter function public.fn_freeze_profile_display_id() set search_path = public;
+alter function public.fn_freeze_vehicle_display_id() set search_path = public;
+alter function public.fn_freeze_closed_session() set search_path = public;
+alter function public.fn_freeze_closed_session_section() set search_path = public;

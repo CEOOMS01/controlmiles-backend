@@ -1,0 +1,14 @@
+REVOKE EXECUTE ON FUNCTION public.http(request http_request) FROM anon, authenticated, public;
+REVOKE EXECUTE ON FUNCTION public.http_delete(uri character varying) FROM anon, authenticated, public;
+REVOKE EXECUTE ON FUNCTION public.http_delete(uri character varying, content character varying, content_type character varying) FROM anon, authenticated, public;
+REVOKE EXECUTE ON FUNCTION public.http_get(uri character varying) FROM anon, authenticated, public;
+REVOKE EXECUTE ON FUNCTION public.http_get(uri character varying, data jsonb) FROM anon, authenticated, public;
+REVOKE EXECUTE ON FUNCTION public.http_head(uri character varying) FROM anon, authenticated, public;
+REVOKE EXECUTE ON FUNCTION public.http_header(field character varying, value character varying) FROM anon, authenticated, public;
+REVOKE EXECUTE ON FUNCTION public.http_list_curlopt() FROM anon, authenticated, public;
+REVOKE EXECUTE ON FUNCTION public.http_patch(uri character varying, content character varying, content_type character varying) FROM anon, authenticated, public;
+REVOKE EXECUTE ON FUNCTION public.http_post(uri character varying, data jsonb) FROM anon, authenticated, public;
+REVOKE EXECUTE ON FUNCTION public.http_post(uri character varying, content character varying, content_type character varying) FROM anon, authenticated, public;
+REVOKE EXECUTE ON FUNCTION public.http_put(uri character varying, content character varying, content_type character varying) FROM anon, authenticated, public;
+REVOKE EXECUTE ON FUNCTION public.http_reset_curlopt() FROM anon, authenticated, public;
+REVOKE EXECUTE ON FUNCTION public.http_set_curlopt(curlopt character varying, value character varying) FROM anon, authenticated, public;
