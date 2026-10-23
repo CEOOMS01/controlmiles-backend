@@ -6,7 +6,7 @@ What the platform ("core") offers and what each service may use. Measured on the
 
 | Domain | Tables |
 |---|---|
-| **core** (platform) | Tenant: `organizations`, `organization_members`, `branches`, `branch_moves`, `fleet_type_changes`. Trips: `sessions`, `session_sections`, `session_gps_breadcrumbs`, `audit_events`, `reports`, `trip_incidents`, `driver_safety_events`. Vehicles: `vehicles`, `vehicle_inspections`, `vehicle_maintenance_records`, `vehicle_odometer_checkpoints`. Identity: `profiles`, `user_onboarding`. Internal: `auth_signup_errors`, `edge_function_rate_limits`, `report_access_attempts`, `pdf_export_log`, `plan_feature_rules`. |
+| **core** (platform) | Tenant: `organizations`, `organization_members`, `branches`, `branch_moves`, `fleet_type_changes`. Trips: `sessions`, `session_sections`, `session_gps_breadcrumbs`, `audit_events`, `reports`, `trip_incidents`, `driver_safety_events`. Vehicles: `vehicles`, `vehicle_inspections`, `vehicle_maintenance_records`, `vehicle_odometer_checkpoints`. Identity: `profiles`, `user_onboarding`. Internal: `auth_signup_errors`, `edge_function_rate_limits`, `report_access_attempts`, `pdf_export_log`, `plan_feature_rules`, `fleet_plans`, `service_license_fees`. |
 | **fleet** (general fleet service) | `driver_invites`, `fleet_driver_slots`, `driver_notifications`, `driver_workdays`, `shifts`, `shift_blocks`, `routes`, `trip_approvals`, `fuel_*`, `ifta_*`, `vehicle_geofence*`, `driver_slot_claim_attempts` |
 | **school_bus** | `school_sites`, `students`, `route_stops`, `route_runs`, `route_stop_events`, `route_crew_overrides`, `ridership_events`, `student_stop_assignments`, `school_guardians`, `student_guardians`, `guardian_invites` |
 | **driving_school** | the 20 `ds_*` tables |
