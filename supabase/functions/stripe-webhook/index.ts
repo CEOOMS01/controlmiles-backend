@@ -22,22 +22,24 @@
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import {
-  SCHOOL_BRANCH_PRICE_IDS,
-  SCHOOL_PRICE_IDS,
-  SCHOOL_DOMAIN_PRICE_ID,
-  isSchoolBranchPrice,
-  isSchoolExtraPrice,
-  schoolBranchExtras,
-} from '../_shared/school_pricing.ts';
+  DOMAIN_KEY,
+  branchExtras,
+  branchKeyFor,
+  isBranchKey,
+  isDomainKey,
+  isExtraKey,
+  isPlanKey,
+  loadPlan,
+  stripePricesByKey,
+  tierFromKey,
+  type FleetTier,
+} from './fleet_pricing.ts';
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? '';
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') ?? '';
 const CGC_ENDPOINT = Deno.env.get('CGC_ENDPOINT') ?? '';
 const CGC_API_KEY = Deno.env.get('CGC_API_KEY') ?? '';
 const CGC_PLAN_FOR_SUBSCRIBED = Deno.env.get('CGC_PLAN_FOR_SUBSCRIBED') ?? 'STANDARD';
-const STRIPE_PRICE_ID_FLEET_STARTER = Deno.env.get('STRIPE_PRICE_ID_FLEET_STARTER') ?? '';
-const STRIPE_PRICE_ID_FLEET_GROWTH = Deno.env.get('STRIPE_PRICE_ID_FLEET_GROWTH') ?? '';
-const STRIPE_PRICE_ID_FLEET_ENTERPRISE = Deno.env.get('STRIPE_PRICE_ID_FLEET_ENTERPRISE') ?? '';
 
 // past_due keeps access while Stripe retries the card (see
 // fn_org_effective_tier); unpaid/canceled/incomplete* do not.
@@ -146,23 +148,46 @@ function must<T extends { error: any }>(result: T, what: string): T {
   return result;
 }
 
-// The plan comes from the PRICE, not metadata: a Starter -> Growth switch in
-// the Stripe customer portal changes the price but keeps the checkout's
-// metadata.tier.
-// A driving school's subscription can also carry an extra-branches item
-// (2026-10-20); the vehicle item is the one that isn't a branch price.
+// The plan comes from the PRICE (its lookup_key fleet_plan_<tier>), not
+// metadata: a Starter -> Growth switch in the Stripe customer portal changes
+// the price but keeps the checkout's metadata.tier.
+// A subscription can also carry extra-branch and own-address items
+// (_shared/fleet_pricing.ts); the car item is the plan price.
 function vehicleItem(sub: any): any {
   const items: any[] = sub.items?.data ?? [];
-  return items.find((i) => !isSchoolExtraPrice(i?.price?.id)) ?? items[0];
+  return items.find((i) => isPlanKey(i?.price?.lookup_key)) ?? items.find((i) => !isExtraKey(i?.price?.lookup_key)) ?? items[0];
 }
 
-function fleetTier(sub: any): 'starter' | 'growth' | 'enterprise' {
-  const priceId = vehicleItem(sub)?.price?.id;
-  if (priceId && (priceId === STRIPE_PRICE_ID_FLEET_ENTERPRISE || priceId === SCHOOL_PRICE_IDS.enterprise)) return 'enterprise';
-  if (priceId && (priceId === STRIPE_PRICE_ID_FLEET_GROWTH || priceId === SCHOOL_PRICE_IDS.growth)) return 'growth';
-  if (priceId && (priceId === STRIPE_PRICE_ID_FLEET_STARTER || priceId === SCHOOL_PRICE_IDS.starter)) return 'starter';
+function fleetTier(sub: any): FleetTier {
+  const fromPrice = tierFromKey(vehicleItem(sub)?.price?.lookup_key);
+  if (fromPrice) return fromPrice;
   const t = sub.metadata?.tier;
   return t === 'enterprise' ? 'enterprise' : t === 'growth' ? 'growth' : 'starter';
+}
+
+/**
+ * The acquisition of the service (one-time, first invoice of the checkout) is
+ * recorded when the Checkout Session is paid: when, how much in total and at
+ * which plan. A later plan change pays only the difference (checkout computes
+ * it from these columns).
+ */
+async function applyAcquisition(db: SupabaseClient, session: any) {
+  if (session.mode !== 'subscription' || session.payment_status !== 'paid') return;
+  const meta = session.metadata ?? {};
+  if (meta.scope !== 'fleet' || !meta.organization_id) return;
+  const due = Number(meta.acquisition_due_cents ?? 0);
+  const total = Number(meta.acquisition_total_cents ?? 0);
+  if (!(due > 0) || !(total > 0)) return;
+  const tier = meta.tier === 'enterprise' || meta.tier === 'growth' ? meta.tier : 'starter';
+  must(
+    await db.from('organizations').update({
+      service_acquired_at: new Date().toISOString(),
+      service_acquisition_cents: total,
+      service_acquisition_tier: tier,
+    }).eq('id', meta.organization_id),
+    'record acquisition',
+  );
+  console.log(`[stripe-webhook] org ${meta.organization_id} acquisition ${total} (${tier}) recorded`);
 }
 
 async function applyFleetSubscription(db: SupabaseClient, sub: any) {
@@ -255,8 +280,8 @@ async function syncFleetSeats(db: SupabaseClient, invoice: any) {
   if (!item) return;
   const organizationId: string = sub.metadata.organization_id;
 
-  await syncSchoolBranches(db, sub, organizationId);
-  await syncSchoolDomain(db, sub, organizationId);
+  await syncBranches(db, sub, organizationId);
+  await syncDomain(db, sub, organizationId);
 
   const { data: seats } = must(
     await db.rpc('fn_org_billable_vehicles', { p_org_id: organizationId }),
@@ -284,18 +309,19 @@ async function syncFleetSeats(db: SupabaseClient, invoice: any) {
  * Driving schools on Enterprise: before a renewal, bill $29 for the
  * enrollment page on the school's own address while it is live (2026-10-20).
  */
-async function syncSchoolDomain(db: SupabaseClient, sub: any, organizationId: string) {
-  if (!SCHOOL_DOMAIN_PRICE_ID) return;
+async function syncDomain(db: SupabaseClient, sub: any, organizationId: string) {
+  const domainPrice = (await stripePricesByKey(STRIPE_SECRET_KEY, [DOMAIN_KEY])).get(DOMAIN_KEY);
+  if (!domainPrice) return;
   const { data: page } = must(
     await db.from('ds_public_pages').select('domain_status').eq('organization_id', organizationId).maybeSingle(),
     'load public page',
   );
   const live = page?.domain_status === 'verified' && fleetTier(sub) === 'enterprise';
-  const current = (sub.items?.data ?? []).find((i: any) => i?.price?.id === SCHOOL_DOMAIN_PRICE_ID);
+  const current = (sub.items?.data ?? []).find((i: any) => isDomainKey(i?.price?.lookup_key));
   if (live && !current) {
     const form = new URLSearchParams();
     form.set('subscription', sub.id);
-    form.set('price', SCHOOL_DOMAIN_PRICE_ID);
+    form.set('price', domainPrice.id);
     form.set('quantity', '1');
     form.set('proration_behavior', 'none');
     await stripeApi('subscription_items', { method: 'POST', body: form.toString() });
@@ -307,17 +333,12 @@ async function syncSchoolDomain(db: SupabaseClient, sub: any, organizationId: st
 }
 
 /**
- * Driving schools: before a renewal, bill the branches beyond the plan's
+ * Every service: before a renewal, bill the branches beyond the plan's
  * included ones (at most the plan's maximum), at that plan's branch price.
  */
-async function syncSchoolBranches(db: SupabaseClient, sub: any, organizationId: string) {
-  const { data: org } = must(
-    await db.from('organizations').select('industry_template').eq('id', organizationId).maybeSingle(),
-    'load organization',
-  );
-  if (org?.industry_template !== 'driving_school') return;
-
+async function syncBranches(db: SupabaseClient, sub: any, organizationId: string) {
   const tier = fleetTier(sub);
+  const plan = await loadPlan(db, tier);
   const { count } = must(
     await db.from('branches')
       .select('id', { count: 'exact', head: true })
@@ -325,9 +346,10 @@ async function syncSchoolBranches(db: SupabaseClient, sub: any, organizationId: 
       .eq('is_archived', false),
     'count branches',
   );
-  const { extras } = schoolBranchExtras(tier, count ?? 0);
-  const wantPrice = tier === 'growth' ? SCHOOL_BRANCH_PRICE_IDS.growth : tier === 'starter' ? SCHOOL_BRANCH_PRICE_IDS.starter : '';
-  const current = (sub.items?.data ?? []).find((i: any) => isSchoolBranchPrice(i?.price?.id));
+  const { extras } = branchExtras(plan, count ?? 0);
+  const wantKey = branchKeyFor(tier);
+  const wantPrice = wantKey ? (await stripePricesByKey(STRIPE_SECRET_KEY, [wantKey])).get(wantKey)?.id ?? '' : '';
+  const current = (sub.items?.data ?? []).find((i: any) => isBranchKey(i?.price?.lookup_key));
 
   // Wrong plan's branch price (plan changed in the portal) or nothing to bill: remove it.
   if (current && (extras === 0 || current.price.id !== wantPrice)) {
@@ -410,10 +432,16 @@ Deno.serve(async (req: Request) => {
       case 'invoice.upcoming':
         await syncFleetSeats(db, event.data.object);
         break;
+      case 'checkout.session.completed':
+      case 'checkout.session.async_payment_succeeded':
+        // The only thing taken from a checkout: the one-time acquisition of
+        // the service. Status and plan still come from customer.subscription.*.
+        await applyAcquisition(db, event.data.object);
+        break;
       default:
-        // checkout.session.completed, invoice.payment_failed, ...: kept in
-        // subscription_events for the record; customer.subscription.* is
-        // the single source of truth for status.
+        // invoice.payment_failed, ...: kept in subscription_events for the
+        // record; customer.subscription.* is the single source of truth for
+        // status.
         break;
     }
     return respond({ received: true });

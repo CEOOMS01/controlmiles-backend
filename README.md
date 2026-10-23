@@ -22,3 +22,10 @@ Verbatim export (2026-10-23) of every row of `supabase_migrations.schema_migrati
 - Referenced but missing: `supabase/checks/domain_boundaries.sql`.
 - `supabase/pending/`: migrations written and tested but NOT to be applied yet because they depend on a deploy elsewhere (empty now).
 - Edge Function `ds-public-enroll` (deployed 2026-10-23): the door for the public enrollment form; optional secret TURNSTILE_SECRET turns the captcha on.
+
+## Stripe (test mode connected 2026-10-23)
+Catalog created in the Stripe test account (Entorno de prueba de Olympus Mont Systems LLC), found by `lookup_key`, never by id:
+`fleet_plan_starter|growth|enterprise` (monthly, graduated by car), `fleet_branch_starter|growth`, `school_domain`, `acquisition_starter|growth|enterprise` (one-time; `acquisition_<service>_<tier>` overrides one service).
+Functions `create-checkout-session` and `stripe-webhook` use them (copy of `_shared/fleet_pricing.ts` inside each folder; run `python scripts/check_copies.py` before deploying).
+Secrets to set in Supabase (Edge Functions > Secrets): `STRIPE_SECRET_KEY` (sk_test_...) and `STRIPE_WEBHOOK_SECRET` (whsec_... of the webhook endpoint). The old `STRIPE_PRICE_ID_*` secrets are no longer read.
+Webhook endpoint URL: https://zuujwmcftycmdaxesdya.supabase.co/functions/v1/stripe-webhook ; events: customer.subscription.created, .updated, .deleted, .paused, .resumed, invoice.upcoming, checkout.session.completed, checkout.session.async_payment_succeeded.
