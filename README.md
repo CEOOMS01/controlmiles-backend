@@ -20,3 +20,5 @@ Verbatim export (2026-10-23) of every row of `supabase_migrations.schema_migrati
 - Edge Functions where the repo is NEWER than live (not deployed yet): `create-checkout-session`, `stripe-webhook`, `cgc-seal-trip`.
 - `create_driver_invite` regression FIXED 2026-10-23 (migration 20261023151914).
 - Referenced but missing: `supabase/checks/domain_boundaries.sql`.
+- `supabase/pending/`: migrations written and tested but NOT to be applied yet (they depend on a deploy elsewhere). Today: `close_ds_public_enroll_to_anon.sql` (after the web with the ds-public-enroll form is deployed).
+- Edge Function `ds-public-enroll` (deployed 2026-10-23): the door for the public enrollment form; optional secret TURNSTILE_SECRET turns the captcha on.
