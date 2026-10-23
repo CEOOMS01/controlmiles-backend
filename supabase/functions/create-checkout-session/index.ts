@@ -170,7 +170,7 @@ Deno.serve(async (req: Request) => {
     const fee = await acquisitionFeeCents(adminClient, service, tier);
     const now = new Date();
     const dueCents = acquisitionDueCents(fee, acquisitionCreditCents(org, now));
-    // First month free, once per organization: the first monthly charge is
+    // Free month (off while FIRST_MONTH_FREE is false): the first monthly charge is
     // one month after this payment (checkout_rules.ts).
     const firstCharge = firstChargeAt(org, now);
 

@@ -3,18 +3,17 @@
 //
 // When things are charged (owner decision 2026-10-23):
 //   * 15 days free (database trial, no card).
-//   * To continue, the customer pays the ACQUISITION of the service now
-//     (one-time) and the monthly subscription starts one month later: the
-//     acquisition includes the first month of use. In Stripe this is a
-//     subscription with trial_end = one month from the payment; Checkout
-//     charges only the one-time amount today.
-//   * That free month is given ONCE per organization: an organization that
-//     already had a Stripe subscription pays its first month at once.
+//   * To continue, the customer pays the ACQUISITION of the service (one-time)
+//     plus the first month at once. There is NO free month after the trial
+//     (owner decision 2026-10-23: the company cannot afford it). If it is ever
+//     brought back, set FIRST_MONTH_FREE to true: the first monthly charge is
+//     then one month after the payment, once per organization.
 //   * Whoever cancels and comes back within 90 days does not pay the
 //     acquisition again; after 90 days they do.
 // Pure functions so they can be tested without Stripe or the database.
 
 export const CREDIT_WINDOW_DAYS = 90;
+export const FIRST_MONTH_FREE = false;
 
 /** Same day next month (UTC), or the last day of that month when it is shorter. */
 export function addOneMonth(from: Date): Date {
@@ -30,7 +29,7 @@ export function addOneMonth(from: Date): Date {
  * when the free month is not available (the organization had a subscription).
  */
 export function firstChargeAt(org: { stripe_subscription_id: string | null }, now: Date): number | null {
-  if (org.stripe_subscription_id) return null;
+  if (!FIRST_MONTH_FREE || org.stripe_subscription_id) return null;
   return Math.floor(addOneMonth(now).getTime() / 1000);
 }
 
