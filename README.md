@@ -17,5 +17,5 @@ Verbatim export (2026-10-23) of every row of `supabase_migrations.schema_migrati
 - Added from live: 7 migrations of 2026-10-22 (domain guard, school guardians, driving school client portal, public page age of majority) and `20261022190000_capture_vehicles_fleet_template.sql` (objects applied outside the history).
 - Edge Functions added/updated from live: `send-guardian-invite`, `ds-portal-access`, `check-email-exists` (retired stub), `resolve-driver-login` (parent IDs).
 - Edge Functions where the repo is NEWER than live (not deployed yet): `create-checkout-session`, `stripe-webhook`, `cgc-seal-trip`.
-- `create_driver_invite` live is a regression (no slot reuse on re-send); fix pending.
+- `create_driver_invite` regression FIXED 2026-10-23 (migration 20261023151914).
 - Referenced but missing: `supabase/checks/domain_boundaries.sql`.
