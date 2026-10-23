@@ -43,6 +43,7 @@ import {
   stripePricesByKey,
   type FleetTier,
 } from './fleet_pricing.ts';
+import { acquisitionCreditCents, firstChargeAt } from './checkout_rules.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -128,7 +129,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: org, error: orgError } = await adminClient
       .from('organizations')
-      .select('stripe_customer_id, subscription_status, industry_template, service_acquired_at, service_acquisition_cents')
+      .select('stripe_customer_id, stripe_subscription_id, subscription_status, subscription_updated_at, industry_template, service_acquired_at, service_acquisition_cents')
       .eq('id', organizationId)
       .maybeSingle();
     if (orgError || !org) {
@@ -167,8 +168,11 @@ Deno.serve(async (req: Request) => {
     // The acquisition of the service: the plan's fee minus what was paid.
     const service: string = org.industry_template ?? 'general';
     const fee = await acquisitionFeeCents(adminClient, service, tier);
-    const alreadyPaid = org.service_acquired_at ? org.service_acquisition_cents ?? 0 : 0;
-    const dueCents = acquisitionDueCents(fee, alreadyPaid);
+    const now = new Date();
+    const dueCents = acquisitionDueCents(fee, acquisitionCreditCents(org, now));
+    // First month free, once per organization: the first monthly charge is
+    // one month after this payment (checkout_rules.ts).
+    const firstCharge = firstChargeAt(org, now);
 
     const branchKey = branchKeyFor(tier);
     const prices = await stripePricesByKey(STRIPE_SECRET_KEY, [
@@ -206,6 +210,7 @@ Deno.serve(async (req: Request) => {
     } else if (userData.user.email) {
       form.set('customer_email', userData.user.email);
     }
+    if (firstCharge) form.set('subscription_data[trial_end]', String(firstCharge));
     form.set('allow_promotion_codes', 'true');
     form.set('billing_address_collection', 'auto');
     form.set('subscription_data[metadata][organization_id]', organizationId);
@@ -244,6 +249,7 @@ Deno.serve(async (req: Request) => {
       quantity,
       branch_extras: rule.extras,
       acquisition_cents: dueCents,
+      first_charge_at: firstCharge ? new Date(firstCharge * 1000).toISOString() : null,
     });
   } catch (err: any) {
     console.error('[create-checkout-session] Unexpected error:', err);
