@@ -3,6 +3,7 @@
 One repo for everything that runs in Supabase project `zuujwmcftycmdaxesdya`:
 `supabase/migrations` (schema), `supabase/functions` (Edge Functions), `supabase/templates` (auth emails).
 Every service of the ecosystem (Gig app, Fleet app, web, Fleet Services, School Bus, Driving School) talks to this backend; none of them owns migrations any more.
+See docs/CORE_CONTRACT.md for what the platform (core) offers each service.
 
 ## Rules
 1. Nothing is applied to the database without a file here first (no ad-hoc `execute_sql` DDL). If an emergency change is made live, export it here the same day.
