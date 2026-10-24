@@ -145,6 +145,7 @@ def main():
         with zipfile.ZipFile(dest) as z:
             stem = f[:-4]
             z.extractall(a.work)
+        extracted = [os.path.join(a.work, n) for n in os.listdir(a.work) if n.startswith(stem + ".")]
         rd = shapefile.Reader(os.path.join(a.work, stem))
         for sr in rd.iterShapeRecords():
             rec = sr.record.as_dict()
@@ -154,6 +155,9 @@ def main():
             if not rec["FULLNAME"] or len(sr.shape.points) < 2:
                 continue
             edges.append([norm(rec["FULLNAME"]), rec["FULLNAME"], county, left, right, encode_geometry(sr.shape.points)])
+        rd.close()
+        for x in extracted:  # keep only the zip; the unpacked shapefile is several times bigger
+            os.remove(x)
     print(len(edges), "edges with address ranges")
     n = 16
     while n < len(edges) / 2500:
@@ -161,7 +165,7 @@ def main():
     shards = [[] for _ in range(n)]
     for e in edges:
         shards[fnv1a(e[0]) % n].append(e)
-    payloads = [gzip.compress(json.dumps(s, separators=(",", ":")).encode("utf-8"), 9) for s in shards]
+    payloads = [gzip.compress(json.dumps(s, separators=(",", ":")).encode("utf-8"), 6) for s in shards]
     table, off = [], 0
     for p in payloads:
         table.append([off, len(p)])
