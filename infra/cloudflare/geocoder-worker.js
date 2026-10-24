@@ -7,10 +7,11 @@
 // olimsysmaps (key geocode/<ST>.bin). Nothing leaves our infrastructure: no
 // third-party geocoder ever sees an address.
 //
-// Bindings: GEO -> R2 bucket olimsysmaps;  secret GEOCODER_KEY.
+// Bindings: GEO -> R2 bucket olimsysmaps;  optional secret GEOCODER_KEY.
+// Turn OFF "Persist logs" / invocation logs for this Worker in the dashboard.
 // A city in the query ("..., Annapolis, MD") narrows the candidates to the ZIPs
 // that cover a place of that name (header zipCity, from the Census ZCTA-place file).
-// Call (server to server only):  GET /?q=3608+Chestnut+Ave%2C+Baltimore%2C+MD&state=MD
+// Call (server to server only):  POST /  {"q":"3608 Chestnut Ave, Baltimore, MD","state":"MD"}
 //   header  X-CM-Key: <GEOCODER_KEY>
 // Answers  {"covered":true,"results":[{"address","lat","lon","zip","county"}]}
 //   covered=false when we hold no data for that state (the caller then falls
@@ -194,14 +195,22 @@ async function search(env, st, p) {
 
 export default {
   async fetch(request, env) {
-    if (request.method !== "GET") return json({ error: "method" }, 405);
-    if (!env.GEOCODER_KEY || request.headers.get("X-CM-Key") !== env.GEOCODER_KEY) return json({ error: "unauthorized" }, 401);
-    const url = new URL(request.url);
-    const q = (url.searchParams.get("q") || "").slice(0, 200);
+    // POST with a JSON body, never GET with the address in the URL: URLs end up
+    // in Cloudflare's logs, and an address here may be a child's home.
+    if (request.method !== "POST") return json({ error: "method" }, 405);
+    // Optional shared key (set the GEOCODER_KEY secret to require it).
+    if (env.GEOCODER_KEY && request.headers.get("X-CM-Key") !== env.GEOCODER_KEY) return json({ error: "unauthorized" }, 401);
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: "bad json" }, 400);
+    }
+    const q = String(body.q || "").slice(0, 200);
     const p = parse(q);
     if (!p) return json({ covered: true, results: [], note: "not a street address" });
     const have = await covered(env);
-    const wanted = (url.searchParams.get("state") || p.state || "").toUpperCase();
+    const wanted = String(body.state || p.state || "").toUpperCase();
     const states = wanted ? (have.includes(wanted) ? [wanted] : []) : have;
     if (!states.length) return json({ covered: false, results: [] });
     let results = [];
