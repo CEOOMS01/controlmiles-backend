@@ -57,17 +57,20 @@ const json = (body, status = 200) =>
 const headers = new Map();
 const shardCache = new Map();
 let coveredStates = null;
+let coveredAt = 0;
 
+// Which states we hold; refreshed every minute so a newly uploaded state is picked up.
 async function covered(env) {
-  if (coveredStates) return coveredStates;
+  if (coveredStates && Date.now() - coveredAt < 60000) return coveredStates;
   const list = await env.GEO.list({ prefix: "geocode/" });
   coveredStates = list.objects.map((o) => /geocode\/([A-Z]{2})\.bin$/.exec(o.key)?.[1]).filter(Boolean);
+  coveredAt = Date.now();
   return coveredStates;
 }
 
 async function stateHeader(env, st) {
   if (headers.has(st)) return headers.get(st);
-  const key = `geocode/${st}.bin`;
+  const key = "geocode/" + st + ".bin";
   const head = await env.GEO.get(key, { range: { offset: 0, length: 12 } });
   if (!head) return null;
   const buf = new DataView(await head.arrayBuffer());
@@ -80,11 +83,11 @@ async function stateHeader(env, st) {
 }
 
 async function loadShard(env, st, meta, idx) {
-  const ck = `${st}:${idx}`;
+  const ck = st + ":" + idx;
   if (shardCache.has(ck)) return shardCache.get(ck);
   const [off, length] = meta.table[idx];
   if (!length) return [];
-  const obj = await env.GEO.get(`geocode/${st}.bin`, { range: { offset: meta.base + off, length } });
+  const obj = await env.GEO.get("geocode/" + st + ".bin", { range: { offset: meta.base + off, length } });
   const edges = await new Response(obj.body.pipeThrough(new DecompressionStream("gzip"))).json();
   if (shardCache.size > 48) shardCache.delete(shardCache.keys().next().value);
   shardCache.set(ck, edges);
@@ -173,11 +176,11 @@ async function search(env, st, p) {
       const f = s[1] === s[0] ? 0.5 : (p.number - s[0]) / (s[1] - s[0]);
       const pt = locate(decode(e[5]), f, left);
       if (!pt) continue;
-      const id = `${e[1]}|${s[3]}|${e[2]}`;
+      const id = e[1] + "|" + s[3] + "|" + e[2];
       if (seen.has(id)) continue;
       seen.add(id);
       out.push({
-        address: `${p.number} ${e[1]}${s[3] ? `, ${s[3]}` : ""}, ${st}`,
+        address: p.number + " " + e[1] + (s[3] ? ", " + s[3] : "") + ", " + st,
         lat: Math.round(pt[0] * 1e6) / 1e6,
         lon: Math.round(pt[1] * 1e6) / 1e6,
         zip: s[3] || null,
