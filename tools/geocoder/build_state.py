@@ -31,7 +31,7 @@ infra/cloudflare/geocoder-worker.js):
 The street normalisation here and in the Worker MUST stay identical
 (NORM_TESTS below is checked by both).
 """
-import argparse, gzip, io, json, math, os, re, struct, sys, urllib.request, zipfile
+import argparse, gzip, io, json, math, os, re, struct, sys, time, urllib.request, zipfile
 
 try:
     import shapefile  # pyshp
@@ -116,10 +116,22 @@ def zip_places(work: str, zips: set) -> dict:
 
 
 def fetch(url: str, dest: str):
-    if os.path.exists(dest):
+    """Download with retries; a zip that does not open is thrown away and fetched again."""
+    ok = lambda p: os.path.exists(p) and os.path.getsize(p) > 0 and (not p.endswith(".zip") or zipfile.is_zipfile(p))
+    if ok(dest):
         return
-    print("downloading", url)
-    urllib.request.urlretrieve(url, dest)
+    for attempt in range(1, 6):
+        print("downloading", url, f"(try {attempt})")
+        try:
+            urllib.request.urlretrieve(url, dest)
+        except Exception as e:  # network hiccup: wait and retry
+            print("  failed:", e)
+        if ok(dest):
+            return
+        if os.path.exists(dest):
+            os.remove(dest)
+        time.sleep(3 * attempt)
+    raise RuntimeError("could not download " + url)
 
 
 def main():
@@ -139,8 +151,21 @@ def main():
     print(len(files), "county files")
     edges = []
     for f in files:
-        dest = os.path.join(a.work, f)
-        fetch(base + f, dest)
+        # The Census server sometimes rejects one county file ("Request Rejected")
+        # for good; address ranges change slowly, so an earlier release will do.
+        dest = None
+        for y in [a.year, "2024", "2023", "2022"]:
+            name = f.replace(f"_{a.year}_", f"_{y}_")
+            try:
+                fetch(f"https://www2.census.gov/geo/tiger/TIGER{y}/ADDRFEAT/{name}", os.path.join(a.work, name))
+                dest, f = os.path.join(a.work, name), name
+                if y != a.year:
+                    print("  using the", y, "release for", name)
+                break
+            except RuntimeError:
+                continue
+        if dest is None:
+            raise RuntimeError("no release has " + f)
         county = f.split("_")[2]
         with zipfile.ZipFile(dest) as z:
             stem = f[:-4]

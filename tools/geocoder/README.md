@@ -5,12 +5,17 @@ Nothing leaves our infrastructure. Tested against the Census Geocoder on 22
 Maryland addresses: median 7 m apart, max 8 m (a street-range interpolation, so
 it is never rooftop-exact).
 
-## Add a state
+## Build every state (50 + DC + PR, ~1 GB, ~1 hour)
 ```
 pip install pyshp
-python build_state.py MD 24          # abbreviation, state FIPS  ->  geocode_MD.bin
-npx wrangler r2 object put olimsysmaps/geocode/MD.bin --file geocode_MD.bin --remote
+python build_all.py                  # resumable; writes out/geocode_<ST>.bin
 ```
+Copy them as out/geocode/<ST>.bin and upload that folder to the R2 bucket
+olimsysmaps (dashboard: Objects > Upload > drag the `geocode` folder), or with
+wrangler:  `npx wrangler r2 object put olimsysmaps/geocode/MD.bin --file out/geocode/MD.bin --remote`
+for each file. One state only:  `python build_state.py MD 24`.
+The Census server sometimes rejects one county file for good ("Request
+Rejected"); the builder then uses the 2024/2023/2022 release of that county.
 Every file is read in small range requests; a state is 13 MB (Maryland) to a
 few hundred MB. R2 has 10 GB free; the maps file already uses ~9 GB, beyond
 that R2 charges cents per GB-month.
