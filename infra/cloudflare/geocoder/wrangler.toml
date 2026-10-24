@@ -1,0 +1,17 @@
+# Deploy the own-geocoder Worker:  cd infra/cloudflare/geocoder && npx wrangler deploy
+# (needs `npx wrangler login` once, done by the account owner)
+name = "controlmiles-geocoder"
+main = "../geocoder-worker.js"
+compatibility_date = "2026-10-24"
+workers_dev = true
+
+# Addresses must not be kept in Cloudflare's logs.
+[observability]
+enabled = false
+
+[[r2_buckets]]
+binding = "GEO"
+bucket_name = "olimsysmaps"
+
+# Optional shared key (recommended): npx wrangler secret put GEOCODER_KEY
+# and the same value as GEOCODER_KEY in the web app's environment.

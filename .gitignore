@@ -1,2 +1,6 @@
 supabase/.temp/
 .env*
+
+# built geocoder data files (rebuild with tools/geocoder/build_state.py)
+tools/geocoder/out/
+tools/geocoder/tiger_work/
