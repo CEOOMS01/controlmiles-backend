@@ -151,6 +151,12 @@ function parse(q) {
   return { number: Number(m[1]), street, zip, state: st, city: city ? norm(city) : null };
 }
 
+// "nashville" matches "Nashville-Davidson metropolitan government (balance)".
+function cityOk(place, city) {
+  const x = norm(place);
+  return x === city || x.includes(city) || city.includes(x);
+}
+
 function sideMatch(s, number, zip) {
   if (!s) return false;
   const [lo, hi, parity, z] = s;
@@ -163,7 +169,7 @@ function sideMatch(s, number, zip) {
 
 async function search(env, st, p) {
   const meta = await stateHeader(env, st);
-  if (!meta) return [];
+  if (!meta) return { list: [], cityMatch: true };
   const key = norm(p.street);
   const edges = await loadShard(env, st, meta, fnv1a(key) % meta.shards);
   const out = [];
@@ -188,12 +194,19 @@ async function search(env, st, p) {
       });
     }
   }
-  // With a city, keep the candidates whose ZIP covers a place of that name.
+  // With a city, keep the candidates whose ZIP covers a place with that name
+  // (ZIPs with no place data stay). When none does (a mailing city such as
+  // "Brooklyn" or "Hollywood"), return them all but say the city did not match,
+  // so the caller shows a list instead of picking one by itself.
   if (p.city && !p.zip) {
-    const inCity = out.filter((r) => ((meta.zipCity || {})[r.zip] || []).some((n) => norm(n) === p.city));
-    if (inCity.length) return inCity;
+    const inCity = out.filter((r) => {
+      const places = (meta.zipCity || {})[r.zip];
+      return !places || places.some((n) => cityOk(n, p.city));
+    });
+    if (inCity.length) return { list: inCity, cityMatch: true };
+    if (out.length) return { list: out, cityMatch: false };
   }
-  return out;
+  return { list: out, cityMatch: true };
 }
 
 export default {
@@ -217,9 +230,14 @@ export default {
     const states = wanted ? (have.includes(wanted) ? [wanted] : []) : have;
     if (!states.length) return json({ covered: false, results: [] });
     let results = [];
-    for (const st of states) results = results.concat(await search(env, st, p));
+    let cityMatch = true;
+    for (const st of states) {
+      const r = await search(env, st, p);
+      results = results.concat(r.list);
+      if (!r.cityMatch) cityMatch = false;
+    }
     // A matching ZIP first, then the rest; at most 5 candidates.
     results.sort((a, b) => Number(b.zip === p.zip) - Number(a.zip === p.zip));
-    return json({ covered: true, results: results.slice(0, 5) });
+    return json({ covered: true, results: results.slice(0, 5), cityMatch });
   },
 };
