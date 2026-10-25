@@ -157,6 +157,17 @@ function cityOk(place, city) {
   return x === city || x.includes(city) || city.includes(x);
 }
 
+// City for a ZIP, as a person would write it: "Nashville-Davidson metropolitan
+// government (balance)" -> "Nashville". Prefers the place the caller typed; ZIPs
+// the Census place file does not list stay null (DC is always Washington).
+function cityOf(meta, zip, st, want) {
+  if (st === "DC") return "Washington";
+  const places = (meta.zipCity || {})[zip] || [];
+  const pick = (want && places.find((n) => cityOk(n, want))) || places[0];
+  if (!pick) return null;
+  return pick.replace(/\s*\(.*?\)/g, "").replace(/\s+(metropolitan|consolidated|unified) government.*$/i, "").replace(/-Davidson$/, "").trim() || null;
+}
+
 function sideMatch(s, number, zip) {
   if (!s) return false;
   const [lo, hi, parity, z] = s;
@@ -190,6 +201,7 @@ async function search(env, st, p) {
         lat: Math.round(pt[0] * 1e6) / 1e6,
         lon: Math.round(pt[1] * 1e6) / 1e6,
         zip: s[3] || null,
+        city: cityOf(meta, s[3], st, p.city),
         county: e[2],
       });
     }
