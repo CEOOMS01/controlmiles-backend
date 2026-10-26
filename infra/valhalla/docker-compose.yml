@@ -1,0 +1,48 @@
+# Olympus Mont Systems LLC - ControlMiles
+# infra/valhalla/docker-compose.yml
+#
+# OUR OWN road-routing server (Valhalla over OpenStreetMap), for the road path
+# and the leg times of school routes. The stops of a route are children's homes,
+# so no third-party routing service ever sees them: the web server talks only to
+# this one (ROUTING_URL / ROUTING_KEY in Vercel). See README.md.
+#
+# Production: valhalla (internal only) + caddy (HTTPS + the X-CM-Key check).
+# Local test:  docker compose -f docker-compose.local.yml up
+
+services:
+  valhalla:
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    restart: unless-stopped
+    environment:
+      # Comma-separated OpenStreetMap extracts (Geofabrik), e.g. the states of
+      # the customers. Tiles are built on the first start and kept in ./data.
+      tile_urls: ${TILE_URLS:-https://download.geofabrik.de/north-america/us/maryland-latest.osm.pbf}
+      server_threads: ${SERVER_THREADS:-2}
+      serve_tiles: "True"
+      use_tiles_ignore_pbf: "True"
+      build_admins: "False"
+      build_time_zones: "False"
+      build_elevation: "False"
+      build_transit: "False"
+    volumes:
+      - ./data:/custom_files
+    expose:
+      - "8002"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      ROUTING_HOST: ${ROUTING_HOST:?set ROUTING_HOST (a DNS name pointing at this server)}
+      ROUTING_KEY: ${ROUTING_KEY:?set ROUTING_KEY (a long random secret, also set in Vercel)}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - valhalla
+
+volumes:
+  caddy_data:

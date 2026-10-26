@@ -1,0 +1,17 @@
+# Local test of the routing server (no HTTPS, no key): http://127.0.0.1:8002
+services:
+  valhalla:
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    environment:
+      tile_urls: ${TILE_URLS:-https://download.geofabrik.de/north-america/us/maryland-latest.osm.pbf}
+      server_threads: "2"
+      serve_tiles: "True"
+      use_tiles_ignore_pbf: "True"
+      build_admins: "False"
+      build_time_zones: "False"
+      build_elevation: "False"
+      build_transit: "False"
+    volumes:
+      - ./data:/custom_files
+    ports:
+      - "127.0.0.1:8002:8002"

@@ -1,0 +1,10 @@
+# HTTPS (automatic certificate) and a shared key: a request without the right
+# X-CM-Key never reaches Valhalla. No access log is written (the body of a route
+# request is the coordinates of children's homes).
+{$ROUTING_HOST} {
+	@allowed header X-CM-Key {$ROUTING_KEY}
+	handle @allowed {
+		reverse_proxy valhalla:8002
+	}
+	respond "unauthorized" 401
+}
