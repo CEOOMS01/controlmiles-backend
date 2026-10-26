@@ -16,7 +16,7 @@ services:
     environment:
       # Comma-separated OpenStreetMap extracts (Geofabrik), e.g. the states of
       # the customers. Tiles are built on the first start and kept in ./data.
-      tile_urls: ${TILE_URLS:-https://download.geofabrik.de/north-america/us/maryland-latest.osm.pbf}
+      tile_urls: ${TILE_URLS-}
       server_threads: ${SERVER_THREADS:-2}
       serve_tiles: "True"
       use_tiles_ignore_pbf: "True"

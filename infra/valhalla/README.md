@@ -6,9 +6,9 @@ stops (children's homes) never go to a third party.
 ## What it costs and needs
 - One small cloud server, about 8-9 USD a month (a Hetzner CX32 in Ashburn: 4 GB
   RAM, 80 GB disk was the reference). Flat: it does not grow per customer.
-- Tiles per state are built once; Maryland alone is small. Add the states of
-  your customers in `TILE_URLS` (comma separated Geofabrik `.osm.pbf` links). A
-  whole-US build was NOT measured: do it state by state.
+- Tiles per state are built once (Maryland: a 206 MB map). Add the states of your
+  customers as `.pbf` files in `./data`. A whole-US build was NOT measured: do it
+  state by state.
 - The web app asks it once when a route's stops are saved (not on every page
   view), so the traffic is tiny.
 
@@ -19,17 +19,25 @@ stops (children's homes) never go to a third party.
    ```
    ROUTING_HOST=routes.controlmiles.com
    ROUTING_KEY=<long random secret>
-   TILE_URLS=https://download.geofabrik.de/north-america/us/maryland-latest.osm.pbf,https://download.geofabrik.de/north-america/us/district-of-columbia-latest.osm.pbf
    ```
-4. `docker compose up -d` (the first start downloads the maps and builds the
-   tiles; it can take several minutes; `docker compose logs -f valhalla`).
+4. Download the maps of your customers' states into `./data` (Geofabrik's
+   "latest" links REDIRECT to a dated file, so use `curl -L`; the image's own
+   downloader does not follow redirects):
+   ```
+   mkdir -p data
+   curl -L --fail -o data/maryland.osm.pbf https://download.geofabrik.de/north-america/us/maryland-latest.osm.pbf
+   curl -L --fail -o data/district-of-columbia.osm.pbf https://download.geofabrik.de/north-america/us/district-of-columbia-latest.osm.pbf
+   ```
+   Then `docker compose up -d`: the first start builds the tiles from every
+   `.pbf` in `./data` (Maryland took a few minutes on 2 threads; follow it with
+   `docker compose logs -f valhalla`).
 5. In Vercel (Production) set `ROUTING_URL=https://routes.controlmiles.com` and
    `ROUTING_KEY=<the same secret>`, then redeploy. In the panel, a route page
    has a "Draw the road path" button for routes created before.
 
 ## Keep it fresh
-Once a month: `docker compose pull && FORCE_REBUILD=True docker compose up -d`
-(or delete `./data/valhalla_tiles*` and restart) to pick up new OpenStreetMap data.
+Once a month: download the `.pbf` files again (step 4), delete `./data/valhalla_tiles*`
+and run `docker compose up -d` to rebuild the tiles with new OpenStreetMap data.
 
 ## Test it
 ```

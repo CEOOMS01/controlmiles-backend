@@ -3,7 +3,7 @@ services:
   valhalla:
     image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
     environment:
-      tile_urls: ${TILE_URLS:-https://download.geofabrik.de/north-america/us/maryland-latest.osm.pbf}
+      tile_urls: ${TILE_URLS-}
       server_threads: "2"
       serve_tiles: "True"
       use_tiles_ignore_pbf: "True"
