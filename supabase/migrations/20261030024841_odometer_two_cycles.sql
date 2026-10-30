@@ -247,6 +247,9 @@ $fn$;
 
 -- 6. OCR feedback (training data for the odometer reader): what the camera read
 --    vs. what the driver finally confirmed. Numbers only, never the photo.
+insert into ops.domain_tables (tbl, domain) values ('odometer_ocr_feedback', 'core')
+  on conflict do nothing;
+
 create table if not exists public.odometer_ocr_feedback (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
