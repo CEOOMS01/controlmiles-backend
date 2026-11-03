@@ -99,13 +99,23 @@ async function verifyStripeSignature(
   return signatures.some((s) => constantTimeEqual(expected, s));
 }
 
-async function stripeApi(path: string, init: RequestInit = {}): Promise<any> {
+/**
+ * `idemSeed` (the event/invoice id) makes a write idempotent: Stripe delivers
+ * a webhook again after a failure, and the retry must not add or change an
+ * item twice. The path and body are part of the key, so a retry that now
+ * wants something different is a new request, never a Stripe key clash.
+ */
+async function stripeApi(path: string, init: RequestInit = {}, idemSeed?: string): Promise<any> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${STRIPE_SECRET_KEY}`,
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
+  if (idemSeed) {
+    headers['Idempotency-Key'] = `wh:${idemSeed}:${init.method ?? 'GET'}:${path}:${init.body ?? ''}`.slice(0, 255);
+  }
   const res = await fetch(`https://api.stripe.com/v1/${path}`, {
     ...init,
-    headers: {
-      Authorization: `Bearer ${STRIPE_SECRET_KEY}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+    headers,
   });
   if (!res.ok) throw new Error(`Stripe ${path} -> ${res.status}: ${await res.text()}`);
   return await res.json();
@@ -280,8 +290,8 @@ async function syncFleetSeats(db: SupabaseClient, invoice: any) {
   if (!item) return;
   const organizationId: string = sub.metadata.organization_id;
 
-  await syncBranches(db, sub, organizationId);
-  await syncDomain(db, sub, organizationId);
+  await syncBranches(db, sub, organizationId, invoice.id);
+  await syncDomain(db, sub, organizationId, invoice.id);
 
   const { data: seats } = must(
     await db.rpc('fn_org_billable_vehicles', { p_org_id: organizationId }),
@@ -294,7 +304,7 @@ async function syncFleetSeats(db: SupabaseClient, invoice: any) {
   form.set('quantity', String(quantity));
   // The renewal invoice is billed at the new count; no mid-period proration.
   form.set('proration_behavior', 'none');
-  await stripeApi(`subscription_items/${item.id}`, { method: 'POST', body: form.toString() });
+  await stripeApi(`subscription_items/${item.id}`, { method: 'POST', body: form.toString() }, invoice.id);
 
   must(
     await db.from('organizations')
@@ -309,7 +319,7 @@ async function syncFleetSeats(db: SupabaseClient, invoice: any) {
  * Driving schools on Enterprise: before a renewal, bill $29 for the
  * enrollment page on the school's own address while it is live (2026-10-20).
  */
-async function syncDomain(db: SupabaseClient, sub: any, organizationId: string) {
+async function syncDomain(db: SupabaseClient, sub: any, organizationId: string, idemSeed: string) {
   const domainPrice = (await stripePricesByKey(STRIPE_SECRET_KEY, [DOMAIN_KEY])).get(DOMAIN_KEY);
   if (!domainPrice) return;
   const { data: page } = must(
@@ -324,10 +334,10 @@ async function syncDomain(db: SupabaseClient, sub: any, organizationId: string) 
     form.set('price', domainPrice.id);
     form.set('quantity', '1');
     form.set('proration_behavior', 'none');
-    await stripeApi('subscription_items', { method: 'POST', body: form.toString() });
+    await stripeApi('subscription_items', { method: 'POST', body: form.toString() }, idemSeed);
     console.log(`[stripe-webhook] org ${organizationId} own address billed`);
   } else if (!live && current) {
-    await stripeApi(`subscription_items/${current.id}?proration_behavior=none`, { method: 'DELETE' });
+    await stripeApi(`subscription_items/${current.id}?proration_behavior=none`, { method: 'DELETE' }, idemSeed);
     console.log(`[stripe-webhook] org ${organizationId} own address no longer billed`);
   }
 }
@@ -336,7 +346,7 @@ async function syncDomain(db: SupabaseClient, sub: any, organizationId: string) 
  * Every service: before a renewal, bill the branches beyond the plan's
  * included ones (at most the plan's maximum), at that plan's branch price.
  */
-async function syncBranches(db: SupabaseClient, sub: any, organizationId: string) {
+async function syncBranches(db: SupabaseClient, sub: any, organizationId: string, idemSeed: string) {
   const tier = fleetTier(sub);
   const plan = await loadPlan(db, tier);
   const { count } = must(
@@ -353,7 +363,7 @@ async function syncBranches(db: SupabaseClient, sub: any, organizationId: string
 
   // Wrong plan's branch price (plan changed in the portal) or nothing to bill: remove it.
   if (current && (extras === 0 || current.price.id !== wantPrice)) {
-    await stripeApi(`subscription_items/${current.id}?proration_behavior=none`, { method: 'DELETE' });
+    await stripeApi(`subscription_items/${current.id}?proration_behavior=none`, { method: 'DELETE' }, idemSeed);
   }
   if (extras === 0 || !wantPrice) return;
 
@@ -362,11 +372,11 @@ async function syncBranches(db: SupabaseClient, sub: any, organizationId: string
   form.set('proration_behavior', 'none');
   if (current && current.price.id === wantPrice) {
     if (current.quantity === extras) return;
-    await stripeApi(`subscription_items/${current.id}`, { method: 'POST', body: form.toString() });
+    await stripeApi(`subscription_items/${current.id}`, { method: 'POST', body: form.toString() }, idemSeed);
   } else {
     form.set('subscription', sub.id);
     form.set('price', wantPrice);
-    await stripeApi('subscription_items', { method: 'POST', body: form.toString() });
+    await stripeApi('subscription_items', { method: 'POST', body: form.toString() }, idemSeed);
   }
   console.log(`[stripe-webhook] org ${organizationId} extra branches -> ${extras}`);
 }
