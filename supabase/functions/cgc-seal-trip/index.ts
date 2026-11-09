@@ -48,9 +48,69 @@ const CGC_KEYS: Record<string, string> = {
 };
 const LEGACY_CGC_API_KEY = Deno.env.get('CGC_API_KEY') ?? '';
 const cgcKeyFor = (app: string) => CGC_KEYS[app] || LEGACY_CGC_API_KEY;
-const CGC_TIMEOUT_MS = 10000; // Vercel cold starts on CGC Core (SCM/KMS,
-// TCO, ComplianceEngine init) can comfortably exceed 5s on the first call
-// after idle -- same value LedgiProof's report-error uses, tuned live.
+// CGC Core sleeps when idle and its first answer took 22 s (measured 2026-11-09);
+// with 10 s every seal timed out. The driver never waits for this: see waitUntil.
+const CGC_TIMEOUT_MS = 60000;
+const CGC_ATTEMPTS = 2;
+const CGC_RETRY_DELAY_MS = 15000;
+
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
+
+// Runs after the response has gone back to the app. A retry only follows a
+// timeout, a network failure or a 5xx from CGC Core.
+async function sealAfterResponse(
+  // deno-lint-ignore no-explicit-any
+  userClient: any,
+  sessionId: string,
+  form: URLSearchParams,
+  cgcApiKey: string,
+): Promise<void> {
+  for (let attempt = 1; attempt <= CGC_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CGC_TIMEOUT_MS);
+    try {
+      const cgcRes = await fetch(`${CGC_ENDPOINT}/governance/decision`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Authorization: `Bearer ${cgcApiKey}`,
+        },
+        body: form.toString(),
+        signal: controller.signal,
+      });
+      if (!cgcRes.ok) {
+        const text = await cgcRes.text();
+        console.warn(`[cgc-seal-trip] CGC Core returned ${cgcRes.status}: ${text}`);
+        if (cgcRes.status < 500) return;
+      } else {
+        const data = await cgcRes.json();
+        const decisionId: string | undefined = data?.decision_id;
+        if (!decisionId) {
+          console.warn(`[cgc-seal-trip] CGC Core answered without decision_id: ${JSON.stringify(data).slice(0, 300)}`);
+          return;
+        }
+        // Same userClient -- RLS governs this write too (owner or org admin).
+        // Audit 2026-10-10: fn_freeze_closed_session allows the seal once.
+        const { error: sealError } = await userClient
+          .from('sessions')
+          .update({ cgc_decision_id: decisionId, cgc_sealed_at: new Date().toISOString() })
+          .eq('id', sessionId);
+        if (sealError) {
+          console.error(`[cgc-seal-trip] could not store the seal for ${sessionId}: ${sealError.message}`);
+        }
+        return;
+      }
+    } catch (err) {
+      console.warn(`[cgc-seal-trip] attempt ${attempt} failed for ${sessionId}: ${err}`);
+    } finally {
+      clearTimeout(timeout);
+    }
+    if (attempt < CGC_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, CGC_RETRY_DELAY_MS));
+    }
+  }
+  console.error(`[cgc-seal-trip] trip ${sessionId} not sealed after ${CGC_ATTEMPTS} attempts`);
+}
 
 // Security hardening (2026-08-28): same Postgres-backed pattern as
 // create-checkout-session's own rate limiter (see its comment for why
@@ -182,56 +242,11 @@ Deno.serve(async (req: Request) => {
     form.set('data_domains', JSON.stringify(['mileage_tracking']));
     form.set('app_source', appSource);
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), CGC_TIMEOUT_MS);
-
-    let cgcRes: Response;
-    try {
-      cgcRes = await fetch(`${CGC_ENDPOINT}/governance/decision`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Authorization: `Bearer ${cgcApiKey}`,
-        },
-        body: form.toString(),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    if (!cgcRes.ok) {
-      const text = await cgcRes.text();
-      console.warn(`[cgc-seal-trip] CGC Core returned ${cgcRes.status}: ${text}`);
-      return respond({ sealed: false, reason: `CGC Core error ${cgcRes.status}` }, 200);
-    }
-
-    const data = await cgcRes.json();
-    const decisionId: string | undefined = data?.decision_id;
-
-    if (!decisionId) {
-      console.warn(`[cgc-seal-trip] CGC Core answered without decision_id: ${JSON.stringify(data).slice(0, 300)}`);
-      return respond({ sealed: false, reason: 'No decision_id from CGC Core' }, 200);
-    }
-
-    // Same userClient -- RLS governs this write too (owner or org admin).
-    // Audit 2026-10-10: this write used to fail silently (the closed-trip
-    // freeze rejected it, and the error was never read) -- no trip was
-    // ever sealed. fn_freeze_closed_session now allows the seal once.
-    const { error: sealError } = await userClient
-      .from('sessions')
-      .update({ cgc_decision_id: decisionId, cgc_sealed_at: new Date().toISOString() })
-      .eq('id', session.id);
-    if (sealError) {
-      console.error(`[cgc-seal-trip] could not store the seal for ${session.id}: ${sealError.message}`);
-      return respond({ sealed: false, reason: 'Seal not stored', decision_id: decisionId }, 200);
-    }
-
-    return respond({ sealed: true, decision_id: decisionId });
+    // The trip is already closed: answer now and seal afterwards, so nothing in
+    // the app depends on how long CGC Core takes.
+    EdgeRuntime.waitUntil(sealAfterResponse(userClient, session.id, form, cgcApiKey));
+    return respond({ sealed: false, queued: true });
   } catch (err: any) {
-    if (err?.name === 'AbortError') {
-      return respond({ sealed: false, reason: 'CGC Core timeout' }, 200);
-    }
     console.error('[cgc-seal-trip] Unexpected error:', err);
     return respond({ sealed: false, reason: err?.message ?? 'Internal error' }, 200);
   }
