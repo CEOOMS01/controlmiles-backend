@@ -11,9 +11,13 @@ import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 export const PACKAGE_NAME = 'com.olimsys.controlmiles';
 
 // Play Console subscription product IDs -> app tier. Premium includes Base.
+// One plan is sold since 2026-11-13 (monthly or yearly). The yearly price is a base plan of
+// controlmiles_premium_monthly or, if made as its own subscription, controlmiles_premium_annual:
+// both give Premium. Basic is no longer sold; its ID stays so an old purchase keeps working.
 export const PRODUCT_TIERS: Record<string, 'base' | 'premium'> = {
   controlmiles_basic_monthly: 'base',
   controlmiles_premium_monthly: 'premium',
+  controlmiles_premium_annual: 'premium',
 };
 
 type ServiceAccount = { client_email: string; private_key: string };
