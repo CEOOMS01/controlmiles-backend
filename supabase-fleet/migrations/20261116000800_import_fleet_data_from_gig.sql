@@ -1,0 +1,1 @@
+-- Applied on the Fleet project 2026-11-16: copied Fleet's organizations, accounts (with their existing password hashes) and data from the old shared project. Data not stored in the repo.

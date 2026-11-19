@@ -1,0 +1,1 @@
+-- Applied on the Fleet project: cron/function shared secret rotated (value not stored in the repo).
