@@ -69,7 +69,7 @@ function buildEmailHtml(orgName: string, inviteUrl: string, parentId: string, st
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ControlMiles</title>
+<title>CM Fleet</title>
 </head>
 <body style="margin:0; padding:0; background-color:#faf6ee; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#faf6ee; padding:32px 16px;">
@@ -81,10 +81,10 @@ function buildEmailHtml(orgName: string, inviteUrl: string, parentId: string, st
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle; padding-right:10px;">
-                    <img src="https://controlmiles.com/logo_controlmiles.png" width="32" height="32" alt="ControlMiles" style="display:block; border-radius:8px;">
+                    <img src="https://controlmiles.com/logo_controlmiles.png" width="32" height="32" alt="CM Fleet" style="display:block; border-radius:8px;">
                   </td>
                   <td style="vertical-align:middle; font-size:19px; font-weight:700; color:#211c14;">
-                    Control<span style="color:#2c6c99;">Miles</span>
+                    CM <span style="color:#2c6c99;">Fleet</span>
                   </td>
                 </tr>
               </table>
@@ -99,7 +99,7 @@ function buildEmailHtml(orgName: string, inviteUrl: string, parentId: string, st
                 Follow your child's school bus
               </h1>
               <p style="margin:16px 0 0 0; font-size:15px; line-height:1.6; color:#6b6250;">
-                <strong style="color:#211c14;">${safeOrgName}</strong> gave you access to ControlMiles Fleet for ${safeStudents}: when the bus will reach their stop, when they have been dropped off, and a way to tell the school when they won't ride.
+                <strong style="color:#211c14;">${safeOrgName}</strong> gave you access to CM Fleet for ${safeStudents}: when the bus will reach their stop, when they have been dropped off, and a way to tell the school when they won't ride.
               </p>
               ${idBlock}
             </td>
@@ -110,7 +110,7 @@ function buildEmailHtml(orgName: string, inviteUrl: string, parentId: string, st
                 <tr>
                   <td style="border-radius:999px; background-color:#2c6c99;">
                     <a href="${inviteUrl}" style="display:inline-block; padding:13px 32px; font-size:15px; font-weight:600; color:#ffffff; text-decoration:none;">
-                      Open in ControlMiles Fleet
+                      Open in CM Fleet
                     </a>
                   </td>
                 </tr>
@@ -120,14 +120,14 @@ function buildEmailHtml(orgName: string, inviteUrl: string, parentId: string, st
           <tr>
             <td style="padding:24px 40px 32px 40px;">
               <p style="margin:0; font-size:12px; line-height:1.6; color:#9a9080; text-align:center;">
-                Open this link on your phone with the ControlMiles Fleet app installed. It expires in 7 days. If you weren't expecting this email, you can safely ignore it.
+                Open this link on your phone with the CM Fleet app installed. It expires in 7 days. If you weren't expecting this email, you can safely ignore it.
               </p>
             </td>
           </tr>
           <tr>
             <td style="padding:18px 40px; background-color:#faf6ee; border-top:1px solid #e3d9c4;" align="center">
               <p style="margin:0; font-size:11px; color:#9a9080;">
-                ControlMiles by Olimsys
+                CM Fleet by Olimsys
               </p>
             </td>
           </tr>
@@ -232,9 +232,9 @@ Deno.serve(async (req: Request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `ControlMiles <${INVITE_SENDER_EMAIL}>`,
+        from: `CM Fleet <${INVITE_SENDER_EMAIL}>`,
         to: [invite.email],
-        subject: `${org.name}: follow your child's school bus on ControlMiles Fleet`,
+        subject: `${org.name}: follow your child's school bus on CM Fleet`,
         html: buildEmailHtml(org.name, `${INVITE_LINK_BASE}/${token}`, guardian.display_id, students),
       }),
     });

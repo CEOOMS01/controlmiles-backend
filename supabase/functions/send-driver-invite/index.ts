@@ -114,7 +114,7 @@ function buildEmailHtml(
   const safeDriverId = (driverId ?? '').replace(/[^A-Za-z0-9-]/g, '');
   const idBlock = safeDriverId
     ? `<p style="margin:16px 0 0 0; padding:12px 14px; background-color:#faf6ee; border:1px solid #e3d9c4; border-radius:10px; font-size:14px; line-height:1.5; color:#211c14;">
-                Your ${role === 'monitor' ? 'ControlMiles' : 'driver'} ID is <strong style="font-family:Menlo,Consolas,monospace; letter-spacing:0.04em;">${safeDriverId}</strong>. In the app you sign in with this ID and the password you choose when you accept.
+                Your ${role === 'monitor' ? 'CM Fleet' : 'driver'} ID is <strong style="font-family:Menlo,Consolas,monospace; letter-spacing:0.04em;">${safeDriverId}</strong>. In the app you sign in with this ID and the password you choose when you accept.
               </p>`
     : '';
   return `<!DOCTYPE html>
@@ -122,7 +122,7 @@ function buildEmailHtml(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ControlMiles</title>
+<title>CM Fleet</title>
 </head>
 <body style="margin:0; padding:0; background-color:#faf6ee; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#faf6ee; padding:32px 16px;">
@@ -134,10 +134,10 @@ function buildEmailHtml(
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle; padding-right:10px;">
-                    <img src="https://controlmiles.com/logo_controlmiles.png" width="32" height="32" alt="ControlMiles" style="display:block; border-radius:8px;">
+                    <img src="https://controlmiles.com/logo_controlmiles.png" width="32" height="32" alt="CM Fleet" style="display:block; border-radius:8px;">
                   </td>
                   <td style="vertical-align:middle; font-size:19px; font-weight:700; color:#211c14;">
-                    Control<span style="color:#2c6c99;">Miles</span>
+                    CM <span style="color:#2c6c99;">Fleet</span>
                   </td>
                 </tr>
               </table>
@@ -152,7 +152,7 @@ function buildEmailHtml(
                 You've been invited to join<br>${safeOrgName}
               </h1>
               <p style="margin:16px 0 0 0; font-size:15px; line-height:1.6; color:#6b6250;">
-                <strong style="color:#211c14;">${safeOrgName}</strong> has invited you to join their fleet on ControlMiles as ${roleLabel(role)} — ${roleBlurb(role)}.
+                <strong style="color:#211c14;">${safeOrgName}</strong> has invited you to join their fleet on CM Fleet as ${roleLabel(role)} — ${roleBlurb(role)}.
               </p>
               ${idBlock}
             </td>
@@ -180,7 +180,7 @@ function buildEmailHtml(
           <tr>
             <td style="padding:18px 40px; background-color:#faf6ee; border-top:1px solid #e3d9c4;" align="center">
               <p style="margin:0; font-size:11px; color:#9a9080;">
-                ControlMiles by Olimsys
+                CM Fleet by Olimsys
               </p>
             </td>
           </tr>
@@ -311,9 +311,9 @@ Deno.serve(async (req: Request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `ControlMiles <${INVITE_SENDER_EMAIL}>`,
+        from: `CM Fleet <${INVITE_SENDER_EMAIL}>`,
         to: [resolved.email],
-        subject: `${resolved.organization_name} invited you to ControlMiles`,
+        subject: `${resolved.organization_name} invited you to CM Fleet`,
         html: buildEmailHtml(resolved.organization_name, inviteUrl, driverId, inviteRow.intended_role),
       }),
     });
