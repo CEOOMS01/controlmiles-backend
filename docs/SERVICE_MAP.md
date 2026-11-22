@@ -68,11 +68,13 @@ Run `ops.domain_violations()` and the three tests after every migration that tou
 ### School bus
 - **Tables**: `bus_students`, `bus_sites`, `bus_route_stops`, `bus_route_runs`, `bus_route_stop_events`, `bus_route_crew_overrides`,
   `bus_stop_assignments`, `bus_ridership_events`, `bus_guardians`, `bus_student_guardians`, `bus_guardian_invites`, `bus_ride_notices`,
-  `bus_clients`; plus the shared `routes` (`route_type` = `school_am` / `school_pm`).
-- **Web**: `admin/school/*` (routes, students and parents, attendance, live run), `lib/school.ts`, `lib/school-status.ts`, `lib/school-crew.ts`,
+  `bus_clients`, `bus_need_catalog`, `bus_student_needs` (transport needs, below); plus the shared `routes` (`route_type` = `school_am` / `school_pm`).
+- **Web**: `admin/school/*` (routes, students and parents, attendance, live run, `needs` codes), `lib/school-needs.ts`, `lib/school.ts`, `lib/school-status.ts`, `lib/school-crew.ts`,
   `lib/school-attendance.ts`.
 - **Fleet app**: `school_run_screen`, `monitor_home_screen`, `parent_home_screen`; services `school_route_service`, `guardian_service`.
 - **Edge functions**: `send-guardian-invite`.
+
+**Transport needs** (2026-11-21): each school has its own catalog of short codes (`bus_need_catalog`: groups program, equipment, communication, mobility; the Baltimore City model, from the City Schools route-codes sheet, loads in one click with `bus_seed_need_catalog`). A student gets codes (`bus_student_needs`), one program and a short note (`bus_students.program_need_id`, `transport_note`). Never a diagnosis. The driver and the aide read only the needs of the students of their route, through `bus_route_needs(route)`, which returns the legend of the codes used on that route.
 
 ### Fleets (general, trucking, ...)
 - **Tables**: `shifts`, `routes`, `fuel_*`, `ifta_*`, `state_*`, `vehicle_geofence*`, `trip_approvals`, `driver_workdays`, `driver_invites`, ...
