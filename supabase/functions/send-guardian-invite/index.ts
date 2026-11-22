@@ -184,7 +184,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: invite, error: inviteError } = await adminClient
-      .from('guardian_invites')
+      .from('bus_guardian_invites')
       .select('organization_id, guardian_id, email, status, expires_at')
       .eq('token_hash', await sha256Hex(token))
       .maybeSingle();
@@ -206,10 +206,10 @@ Deno.serve(async (req: Request) => {
 
     const [{ data: org }, { data: guardian }, { data: links }] = await Promise.all([
       adminClient.from('organizations').select('name').eq('id', invite.organization_id).maybeSingle(),
-      adminClient.from('school_guardians').select('display_id, is_active').eq('id', invite.guardian_id).maybeSingle(),
+      adminClient.from('bus_guardians').select('display_id, is_active').eq('id', invite.guardian_id).maybeSingle(),
       adminClient
-        .from('student_guardians')
-        .select('students(first_name)')
+        .from('bus_student_guardians')
+        .select('students:bus_students(first_name)')
         .eq('guardian_id', invite.guardian_id)
         .eq('is_active', true),
     ]);

@@ -1,5 +1,7 @@
 # ControlMiles core contract
 
+> The per-service map (tables, code, apps, functions, naming law) is `SERVICE_MAP.md`; this page is the Gig-era contract of what core offers.
+
 What the platform ("core") offers and what each service may use. Measured on the live database on 2026-10-23 with `ops.v_domain_coupling` (a text scan of every public function against `ops.domain_tables`); re-run it, do not trust this page blindly.
 
 ## The five domains (`ops.domain_tables`)
@@ -8,7 +10,7 @@ What the platform ("core") offers and what each service may use. Measured on the
 |---|---|
 | **core** (platform) | Tenant: `organizations`, `organization_members`, `branches`, `branch_moves`, `fleet_type_changes`. Trips: `sessions`, `session_sections`, `session_gps_breadcrumbs`, `audit_events`, `reports`, `trip_incidents`, `driver_safety_events`. Vehicles: `vehicles`, `vehicle_inspections`, `vehicle_maintenance_records`, `vehicle_odometer_checkpoints`. Identity: `profiles`, `user_onboarding`. Internal: `auth_signup_errors`, `edge_function_rate_limits`, `report_access_attempts`, `pdf_export_log`, `plan_feature_rules`, `fleet_plans`, `service_license_fees`. |
 | **fleet** (general fleet service) | `driver_invites`, `fleet_driver_slots`, `driver_notifications`, `driver_workdays`, `shifts`, `shift_blocks`, `routes`, `trip_approvals`, `fuel_*`, `ifta_*`, `vehicle_geofence*`, `driver_slot_claim_attempts` |
-| **school_bus** | `school_sites`, `students`, `route_stops`, `route_runs`, `route_stop_events`, `route_crew_overrides`, `ridership_events`, `student_stop_assignments`, `school_guardians`, `student_guardians`, `guardian_invites` |
+| **school_bus** | the 13 `bus_*` tables (renamed from `school_sites`, `students`, `route_stops`, ... on 2026-11-21 in the Fleet project; see `SERVICE_MAP.md`) |
 | **driving_school** | the 20 `ds_*` tables |
 | **gig** | `gig_apps`, `gig_app_packages`, `subscriptions`, `subscription_events`, `play_subscriptions` |
 
@@ -19,7 +21,7 @@ What the platform ("core") offers and what each service may use. Measured on the
 - **school_bus**: `profiles`, `vehicles` (live location for automatic stop arrival), `sessions` (the run is tied to the driver's trip). It also depends on the fleet table `routes` (`route_type` school_am/school_pm).
 - **driving_school**: no core trips/vehicles in its own functions except through classes. It depends on two fleet tables: `shift_blocks` (**a class is a row of `shift_blocks`**, 12 functions) and `driver_workdays` (`get_my_shift_day`).
 
-So the only real cross-service dependencies are: driving_school -> fleet (`shift_blocks`, `driver_workdays`) and school_bus -> fleet (`routes`). The `students` hits that `ops.v_domain_coupling` shows between driving_school and school_bus are false positives (the word is also a feature name in `fn_require_org_feature(..., 'students')`).
+So the only real cross-service dependencies are: driving_school -> fleet (`shift_blocks`, `driver_workdays`) and school_bus -> fleet (`routes`). The `students` hits that `ops.v_domain_coupling` showed between driving_school and school_bus were false positives (the word is also a feature name in `fn_require_org_feature(..., 'students')`); in Fleet they are gone since the bus tables are `bus_*`.
 
 ## Platform API (what services should call instead of reading tables)
 

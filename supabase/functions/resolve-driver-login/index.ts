@@ -105,7 +105,7 @@ Deno.serve(async (req: Request) => {
     // Only a CLAIMED driver slot (claimed_by not null) has a real account
     // behind it -- an admin-created, not-yet-confirmed slot has no password
     // to check against at all. Not a driver ID: a school bus parent's ID
-    // (CM-######, school_guardians, 2026-10-22), active and accepted.
+    // (CM-######, bus_guardians, 2026-10-22), active and accepted.
     // Same error (400, invalid credentials) either way.
     const { data: slot, error: slotError } = await adminClient
       .from('fleet_driver_slots')
