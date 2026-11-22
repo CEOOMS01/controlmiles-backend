@@ -87,7 +87,7 @@ Run `ops.domain_violations()` and the three tests after every migration that tou
 - **Tables**: tenant (`organizations`, `organization_members`, `branches`), trips (`sessions`, `session_sections`, `session_gps_breadcrumbs`),
   vehicles and inspections, `profiles`, audit and notifications.
 - **Web**: `admin/layout.tsx`, `admin/settings`, `admin/roster`, `admin/vehicles`, `admin/import`, `admin/maintenance`, `admin/reviews`,
-  `admin/org`, `admin/activity`, `lib/fleet-features.ts`, `lib/branch-scope.ts`, `lib/service-profile.ts`, `lib/supabase/*`, `lib/errors.ts`.
+  `admin/org`, `admin/activity`, `admin/dashboard-header.tsx` (the header every service's dashboard shares), `lib/fleet-features.ts`, `lib/branch-scope.ts`, `lib/service-profile.ts`, `lib/supabase/*`, `lib/errors.ts`.
 - **Edge functions**: `report-error`, `ingest-gps-breadcrumb`, `cgc-seal-trip`, `check-email-exists`, `delete-account`.
 - **Billing** (Gig and Fleet plans): `create-checkout-session`, `create-portal-session`, `stripe-webhook`, `verify-play-purchase`, `play-rtdn`.
 
